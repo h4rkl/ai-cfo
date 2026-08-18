@@ -1,0 +1,5 @@
+{"type":"session_meta","timestamp":"2026-08-18T12:00:00.000Z","payload":{"session_id":"codex-demo","cwd":"/Users/karambit/Sites/demo","timestamp":"2026-08-18T12:00:00.000Z"}}
+{"type":"turn_context","timestamp":"2026-08-18T12:00:01.000Z","payload":{"model":"gpt-5.6-terra","cwd":"/Users/karambit/Sites/demo"}}
+{"timestamp":"2026-08-18T12:00:02.000Z","payload":{"type":"user_message","message":"Add auth to the dashboard"}}
+{"type":"event_msg","timestamp":"2026-08-18T12:10:00.000Z","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":10000,"cached_input_tokens":6000,"cache_write_input_tokens":200,"output_tokens":800},"total_token_usage":{"input_tokens":10000,"cached_input_tokens":6000,"cache_write_input_tokens":200,"output_tokens":800}}}}
+{"type":"event_msg","timestamp":"2026-08-18T12:20:00.000Z","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":4000,"cached_input_tokens":3000,"cache_write_input_tokens":0,"output_tokens":200},"total_token_usage":{"input_tokens":14000,"cached_input_tokens":9000,"cache_write_input_tokens":200,"output_tokens":1000}}}}

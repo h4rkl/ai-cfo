@@ -1,0 +1,5 @@
+{"type":"user","cwd":"/Users/karambit/Sites/demo","sessionId":"sess-claude","timestamp":"2026-08-18T10:00:00.000Z","message":{"content":"Ship the Figma landing page"}}
+{"type":"ai-title","aiTitle":"Figma landing page","sessionId":"sess-claude"}
+{"type":"assistant","cwd":"/Users/karambit/Sites/demo","sessionId":"sess-claude","timestamp":"2026-08-18T10:05:00.000Z","message":{"id":"msg_1","model":"claude-sonnet-5","usage":{"input_tokens":1000,"output_tokens":200,"cache_read_input_tokens":4000,"cache_creation_input_tokens":500}}}
+{"type":"assistant","cwd":"/Users/karambit/Sites/demo","sessionId":"sess-claude","timestamp":"2026-08-18T10:05:01.000Z","message":{"id":"msg_1","model":"claude-sonnet-5","usage":{"input_tokens":1000,"output_tokens":200,"cache_read_input_tokens":4000,"cache_creation_input_tokens":500}}}
+{"type":"assistant","cwd":"/Users/karambit/Sites/demo","sessionId":"sess-claude","timestamp":"2026-08-18T10:20:00.000Z","message":{"id":"msg_2","model":"claude-sonnet-5","usage":{"input_tokens":2000,"output_tokens":400,"cache_read_input_tokens":8000,"cache_creation_input_tokens":0}}}

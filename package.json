@@ -1,0 +1,21 @@
+{
+  "name": "ai-cfo",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Virtual CFO for Codex, Claude, contractor, and time-to-delivery tradeoffs.",
+  "scripts": {
+    "dev": "VITE_CONFIG_NATIVE_IGNORE_WARNING=true node ./node_modules/vite/bin/vite.js --host 127.0.0.1 --port 5173",
+    "build": "node ./node_modules/typescript/bin/tsc --noEmit && node ./node_modules/vite/bin/vite.js build",
+    "preview": "node ./node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 4173",
+    "test": "node ./node_modules/vitest/vitest.mjs run",
+    "test:watch": "node ./node_modules/vitest/vitest.mjs",
+    "app": "npm run build && bash scripts/build-macos.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.10"
+  }
+}
