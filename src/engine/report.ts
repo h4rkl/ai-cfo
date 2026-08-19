@@ -91,14 +91,14 @@ export function reportHtml(
   <title>AI CFO — ${esc(workflow.name)}</title>
   <style>
     :root { color-scheme: light; }
-    body { font-family: "Iowan Old Style", Palatino, "Palatino Linotype", serif; margin: 48px auto; max-width: 820px; color: #1b1914; }
-    h1 { font-size: 28px; margin: 0 0 8px; }
-    h2 { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; margin: 28px 0 10px; }
+    body { font-family: Inter, "Segoe UI", system-ui, sans-serif; margin: 48px auto; max-width: 820px; color: #111113; }
+    h1 { font-size: 24px; margin: 0 0 8px; letter-spacing: -0.03em; }
+    h2 { font-size: 12px; font-weight: 500; color: #8b9099; margin: 28px 0 10px; }
     p { line-height: 1.55; }
-    table { width: 100%; border-collapse: collapse; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
-    th, td { border-bottom: 1px solid #d7d0c3; padding: 8px 6px; text-align: right; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border-bottom: 1px solid #eceef2; padding: 10px 8px; text-align: right; }
     th:first-child, td:first-child { text-align: left; }
-    tr.win td { font-weight: 700; background: #f3ead4; }
+    tr.win td { font-weight: 600; background: #f4f5f7; }
     ul { padding-left: 18px; }
     @media print { body { margin: 16mm; } }
   </style>

@@ -95,44 +95,98 @@ function render(): void {
   const workflow = wf();
   const comparison = compareWorkflow(state, workflow);
   const tokens = tokensForLane(workflow, state.estimate);
-  const y = window.scrollY;
+  const desk = root!.querySelector<HTMLElement>(".desk");
+  const y = desk ? desk.scrollTop : window.scrollY;
 
   root!.innerHTML = `
-    <div class="shell">
-      <header class="topbar">
-        <div class="brand">
-          <h1>AI <span>CFO</span></h1>
-          <p>model · contractor · time-to-delivery</p>
-        </div>
-        <div class="tabs" role="tablist">
-          ${tab("compare", "Compare")}
-          ${tab("usage", "Local usage")}
-          ${tab("models", "Models")}
-          ${tab("report", "Report")}
-        </div>
-        <div class="cluster">
-          <button class="ghost" data-act="export-state">Export workspace</button>
-          <label class="ghost file-btn">Import workspace
-            <input class="hidden" type="file" accept="application/json" data-import="workspace" />
-          </label>
-        </div>
-      </header>
-      ${
-        screen === "compare"
-          ? compareScreen(workflow, comparison, tokens)
-          : screen === "usage"
-            ? usageScreen()
-            : screen === "models"
-              ? modelsScreen()
-              : reportScreen(workflow, comparison)
-      }
+    <div class="app-frame">
+      ${sidebar(workflow)}
+      <div class="desk">
+        ${topbar(workflow)}
+        ${
+          screen === "compare"
+            ? compareScreen(workflow, comparison, tokens)
+            : screen === "usage"
+              ? usageScreen()
+              : screen === "models"
+                ? modelsScreen()
+                : reportScreen(workflow, comparison)
+        }
+      </div>
     </div>
   `;
-  window.scrollTo(0, keepScroll ? y : 0);
+  const next = root!.querySelector<HTMLElement>(".desk");
+  if (next) next.scrollTop = keepScroll ? y : 0;
+  else window.scrollTo(0, keepScroll ? y : 0);
 }
 
-function tab(id: Screen, label: string): string {
-  return `<button class="tab" role="tab" data-screen="${id}" aria-selected="${screen === id}">${label}</button>`;
+function screenLabel(id: Screen): string {
+  return id === "compare" ? "Compare" : id === "usage" ? "Local usage" : id === "models" ? "Models" : "Report";
+}
+
+function sidebar(workflow: Workflow): string {
+  return `
+    <aside class="sidenav">
+      <div class="brand">
+        <h1>AI CFO</h1>
+        <p>model · contractor · time-to-delivery</p>
+      </div>
+      <nav class="nav-scroll" role="tablist">
+        <p class="nav-label">Main Menu</p>
+        ${navItem("compare", "Compare", "grid")}
+        ${navItem("usage", "Local usage", "bars")}
+        <p class="nav-label">Insights</p>
+        ${navItem("models", "Models", "box")}
+        ${navItem("report", "Report", "file")}
+        <p class="nav-label">Workspace</p>
+        <button class="nav-item" type="button" data-act="export-state">${icon("download")}<span>Export workspace</span></button>
+        <label class="nav-item file-btn">${icon("upload")}<span>Import workspace</span>
+          <input class="hidden" type="file" accept="application/json" data-import="workspace" />
+        </label>
+      </nav>
+      <div class="nav-foot">
+        <div class="avatar">${esc(initials(workflow.name))}</div>
+        <div class="who">
+          <b>${esc(workflow.name)}</b>
+          <span>model · contractor · time-to-delivery</span>
+        </div>
+        <button class="icon-btn" data-act="export-state" title="Export workspace">${icon("logout")}</button>
+      </div>
+    </aside>
+  `;
+}
+
+function topbar(workflow: Workflow): string {
+  return `
+    <header class="top">
+      <div class="crumb">
+        <span>Workspace</span>
+        <span class="crumb-sep">›</span>
+        <b>${screenLabel(screen)}</b>
+      </div>
+      <div class="top-tools">
+        ${
+          screen === "compare"
+            ? `<label class="search-pill">${icon("search")}
+                <select data-field="active" aria-label="Workflow">
+                  ${state.workflows
+                    .map((w) => `<option value="${w.id}" ${w.id === workflow.id ? "selected" : ""}>${esc(w.name)}</option>`)
+                    .join("")}
+                </select>
+              </label>`
+            : ""
+        }
+        <button class="icon-btn" data-act="export-state" title="Export workspace">${icon("download")}</button>
+        <label class="icon-btn file-btn" title="Import workspace">${icon("upload")}
+          <input class="hidden" type="file" accept="application/json" data-import="workspace" />
+        </label>
+      </div>
+    </header>
+  `;
+}
+
+function navItem(id: Screen, label: string, glyph: string): string {
+  return `<button class="nav-item" role="tab" data-screen="${id}" aria-selected="${screen === id}">${icon(glyph)}<span>${label}</span></button>`;
 }
 
 function compareScreen(
@@ -141,29 +195,58 @@ function compareScreen(
   tokens: { inputTokens: number; outputTokens: number; cachedInputTokens: number },
 ): string {
   const { contractor, lanes, winner, briefing } = comparison;
+  const roiLabel = winner.kind === "contractor" ? "—" : `${winner.roi.toFixed(1)}×`;
+  const savedShare = contractor.totalCost > 0 ? clamp((winner.savingsVsContractor / contractor.totalCost) * 100, 0, 100) : 0;
   return `
-    <div class="workspace">
-      <aside class="rail">
-        <p class="kicker">Delivery</p>
-        <label class="field">
-          <span>Workflow</span>
-          <select data-field="active">
-            ${state.workflows
-              .map((w) => `<option value="${w.id}" ${w.id === workflow.id ? "selected" : ""}>${esc(w.name)}</option>`)
-              .join("")}
-          </select>
-        </label>
-        <div class="actions">
+    <div class="board">
+      ${kpi("All-in cost", usd(winner.totalCost), winner.label, "bag", winner.costScore)}
+      ${kpi("Time to delivery", `${winner.calendarDays}d`, `${winner.cfoScore} ${winner.grade}`, "clock", winner.speedScore)}
+      ${kpi("ROI vs contractors", roiLabel, winner.label, "trend", clamp(winner.roi * 10, 0, 100))}
+      ${kpi("Cash saved", usd(winner.savingsVsContractor), winner.label, "refresh", savedShare)}
+
+      <section class="cell span-8">
+        <div class="cell-head">
+          <div>
+            <h2>Sweet spot</h2>
+          </div>
+        </div>
+        <div class="compass-wrap">
+          ${compassSvg(comparison)}
+          <div class="verdict">
+            <h2>${esc(winner.label)} ${gradePill(winner.grade)}</h2>
+            <p class="sub">${esc(briefing)}</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="cell span-4">
+        <div class="cell-head">
+          <div>
+            <h2>CFO score ${winner.cfoScore}</h2>
+            <p>${esc(winner.label)}</p>
+          </div>
+          ${gradePill(winner.grade)}
+        </div>
+        ${scoreBars(winner)}
+      </section>
+
+      <section class="cell span-4">
+        <div class="cell-head">
+          <div>
+            <h2>Delivery</h2>
+            <p>How you know the cost</p>
+          </div>
+        </div>
+        <div class="actions" style="margin-top:0">
           <button class="ghost" data-act="new-wf">New</button>
           <button class="ghost" data-act="dup-wf">Duplicate</button>
           <button class="ghost" data-act="del-wf">Delete</button>
         </div>
-        <div class="chips" style="margin:12px 0 18px">
+        <div class="chips" style="margin:12px 0 14px">
           ${PRESETS.map(
             (p) => `<button class="chip" data-preset="${p.id}" title="${esc(p.hint)}">${esc(p.label)}</button>`,
           ).join("")}
         </div>
-
         <label class="field">
           <span>Name</span>
           <input type="text" data-wf="name" value="${esc(workflow.name)}" />
@@ -172,7 +255,6 @@ function compareScreen(
           <span>Notes</span>
           <textarea data-wf="notes">${esc(workflow.notes)}</textarea>
         </label>
-
         <div class="section">
           <p class="kicker">How you know the cost</p>
           <div class="seg" role="group">
@@ -181,7 +263,6 @@ function compareScreen(
             ${seg("inputMode", "import", "Import", workflow.inputMode)}
           </div>
         </div>
-
         <div class="section">
           <p class="kicker">Billing</p>
           <div class="seg" role="group">
@@ -190,7 +271,47 @@ function compareScreen(
             ${seg("billingMode", "both", "Both", workflow.billingMode)}
           </div>
         </div>
+      </section>
 
+      <section class="cell span-8">
+        <div class="cell-head">
+          <div>
+            <h2>Path</h2>
+          </div>
+          <button class="pill-btn" data-act="goto-report">Open report</button>
+        </div>
+        <table class="ledger">
+          <thead>
+            <tr>
+              <th>Path</th>
+              <th>Total</th>
+              <th>Model</th>
+              <th>Human</th>
+              <th>Seats</th>
+              <th>Days</th>
+              <th>Cash vs contractors</th>
+              <th>ROI</th>
+              <th>Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${ledgerRow(contractor, false, true)}
+            ${lanes.map((l) => ledgerRow(l, l.id === winner.id, false)).join("")}
+          </tbody>
+        </table>
+        <div class="brief">
+          <p class="kicker">CFO note</p>
+          <p>${esc(briefing)}</p>
+          <div class="actions">
+            <button class="primary" data-act="goto-report">Open report</button>
+            <button class="ghost" data-act="download-md">Download markdown</button>
+            <button class="ghost" data-act="download-html">Download HTML</button>
+            <button class="ghost" data-act="print">Print</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="cell span-3">
         <div class="section">
           <p class="kicker">Contractor baseline</p>
           <div class="pair">
@@ -199,7 +320,6 @@ function compareScreen(
           </div>
           ${num("calendarDaysContractor", "Calendar days", workflow.calendarDaysContractor, "d")}
         </div>
-
         <div class="section">
           <p class="kicker">With Codex / Claude</p>
           <div class="pair">
@@ -213,7 +333,9 @@ function compareScreen(
           ${num("reworkRate", "Rework fraction", workflow.reworkRate, "", 0.01)}
           ${num("loc", "Delivered LOC", workflow.loc, "")}
         </div>
+      </section>
 
+      <section class="cell span-3">
         ${
           workflow.inputMode === "forecast"
             ? `<div class="section">
@@ -254,7 +376,9 @@ function compareScreen(
                 ${num("actuals.cachedInputTokens", "Cached input", workflow.actuals.cachedInputTokens, "")}
               </div>`
         }
+      </section>
 
+      <section class="cell span-3">
         <div class="section">
           <p class="kicker">Rates</p>
           <div class="pair">
@@ -266,7 +390,6 @@ function compareScreen(
             ${rate("opportunityPerDay", "Day of delay $", state.rates.opportunityPerDay)}
           </div>
         </div>
-
         <div class="section">
           <p class="kicker">Monthly seats</p>
           <div class="pair">
@@ -275,7 +398,9 @@ function compareScreen(
           </div>
           ${seat("workflowsPerMonth", "Deliveries / month", state.seats.workflowsPerMonth)}
         </div>
+      </section>
 
+      <section class="cell span-3">
         <div class="section">
           <p class="kicker">Compare models</p>
           <div class="chips">
@@ -287,55 +412,7 @@ function compareScreen(
               .join("")}
           </div>
         </div>
-      </aside>
-
-      <main class="stage">
-        <p class="kicker">Sweet spot</p>
-        <div class="hero">
-          ${compassSvg(comparison)}
-          <div class="verdict">
-            <h2>${esc(winner.label)} <span class="stamp">${esc(winner.grade)}</span></h2>
-            <p class="sub">${esc(briefing)}</p>
-            <div class="metrics">
-              ${metric(usd(winner.totalCost), "All-in cost")}
-              ${metric(`${winner.calendarDays}d`, "Time to delivery")}
-              ${metric(winner.kind === "contractor" ? "—" : `${winner.roi.toFixed(1)}×`, "ROI vs contractors")}
-              ${metric(usd(winner.savingsVsContractor), "Cash saved")}
-            </div>
-          </div>
-        </div>
-
-        <table class="ledger">
-          <thead>
-            <tr>
-              <th>Path</th>
-              <th>Total</th>
-              <th>Model</th>
-              <th>Human</th>
-              <th>Seats</th>
-              <th>Days</th>
-              <th>Cash vs contractors</th>
-              <th>ROI</th>
-              <th>Score</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${ledgerRow(contractor, false, true)}
-            ${lanes.map((l) => ledgerRow(l, l.id === winner.id, false)).join("")}
-          </tbody>
-        </table>
-
-        <div class="brief">
-          <p class="kicker">CFO note</p>
-          <p>${esc(briefing)}</p>
-          <div class="actions">
-            <button class="primary" data-act="goto-report">Open report</button>
-            <button class="ghost" data-act="download-md">Download markdown</button>
-            <button class="ghost" data-act="download-html">Download HTML</button>
-            <button class="ghost" data-act="print">Print</button>
-          </div>
-        </div>
-      </main>
+      </section>
     </div>
   `;
 }
@@ -347,9 +424,11 @@ function usageScreen(): string {
   );
   return `
     <div class="stage">
-      <p class="kicker">Local Claude + Codex</p>
-      <p class="hint">Reads the same session logs CodexBar uses: ~/.claude/projects and ~/.codex/sessions. No login. API-equivalent spend, not your subscription bill.</p>
-      <div class="actions" style="margin:14px 0 18px">
+      <div class="stage-intro">
+        <p class="kicker">Local Claude + Codex</p>
+        <p class="hint">Reads the same session logs CodexBar uses: ~/.claude/projects and ~/.codex/sessions. No login. API-equivalent spend, not your subscription bill.</p>
+      </div>
+      <div class="toolbar">
         <button class="primary" data-act="scan-usage">${usageLoading ? "Scanning…" : "Scan this Mac"}</button>
         <div class="seg" style="max-width:280px">
           ${["7", "30", "90"].map((d) => `<button type="button" aria-pressed="${usageDays === Number(d)}" data-usage-days="${d}">${d}d</button>`).join("")}
@@ -363,63 +442,71 @@ function usageScreen(): string {
             .join("")}
         </div>
       </div>
-      ${usageError ? `<p class="hint" style="color:var(--signal)">${esc(usageError)}</p>` : ""}
+      ${usageError ? `<p class="hint pad" style="color:var(--signal)">${esc(usageError)}</p>` : ""}
       ${
         summary
-          ? `<div class="metrics">
-              ${metric(usd(summary.totals.apiCost), "API-equivalent spend")}
-              ${metric(String(summary.totals.sessions), "Sessions")}
-              ${metric(fmtInt(summary.totals.inputTokens + summary.totals.outputTokens), "Tokens")}
-              ${metric(`${summary.byProvider.claude.sessions} / ${summary.byProvider.codex.sessions}`, "Claude / Codex")}
-            </div>
-            <div class="brief" style="margin-top:16px">
-              <p class="kicker">Completed work</p>
-              <p>Select the sessions that match a delivery, then compare that actual token mix against other models and contractors.</p>
-              <div class="actions">
-                <button class="primary" data-act="compare-selected">Compare selected</button>
-                <button class="ghost" data-act="compare-all-visible">Compare all visible</button>
-              </div>
-            </div>
-            <table class="ledger" style="margin-top:16px">
-              <thead>
-                <tr>
-                  <th></th>
-                  <th>Work</th>
-                  <th>Project</th>
-                  <th>Source</th>
-                  <th>Model</th>
-                  <th>Hours</th>
-                  <th>Tokens</th>
-                  <th>API $</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rows
-                  .map((s) => usageRow(s))
-                  .join("") || `<tr><td colspan="8">No sessions in this window.</td></tr>`}
-              </tbody>
-            </table>
-            ${
-              summary.projects.length
-                ? `<h3 class="kicker" style="margin-top:28px">By project</h3>
+          ? `<div class="board">
+              ${kpi("API-equivalent spend", usd(summary.totals.apiCost), `${summary.totals.sessions} sessions`, "bag", clamp(summary.totals.sessions * 4, 18, 88))}
+              ${kpi("Sessions", String(summary.totals.sessions), `${usageDays}d`, "bars", clamp(summary.totals.sessions * 5, 18, 88))}
+              ${kpi("Tokens", fmtInt(summary.totals.inputTokens + summary.totals.outputTokens), `${fmtInt(summary.totals.inputTokens)} in · ${fmtInt(summary.totals.outputTokens)} out`, "file", clamp(Math.log10(Math.max(summary.totals.inputTokens + summary.totals.outputTokens, 10)) * 14, 18, 88))}
+              ${kpi("Claude / Codex", `${summary.byProvider.claude.sessions} / ${summary.byProvider.codex.sessions}`, "Claude / Codex", "refresh", summary.totals.sessions ? (summary.byProvider.claude.sessions / summary.totals.sessions) * 100 : 50)}
+              <section class="cell span-4">
+                <div class="cell-head">
+                  <div>
+                    <h2>Completed work</h2>
+                    <p>Select the sessions that match a delivery, then compare that actual token mix against other models and contractors.</p>
+                  </div>
+                </div>
+                <div class="actions" style="margin-top:0">
+                  <button class="primary" data-act="compare-selected">Compare selected</button>
+                  <button class="ghost" data-act="compare-all-visible">Compare all visible</button>
+                </div>
+              </section>
+              <section class="cell span-8">
                 <table class="ledger">
-                  <thead><tr><th>Project</th><th>Sessions</th><th>Tokens</th><th>API $</th></tr></thead>
+                  <thead>
+                    <tr>
+                      <th></th>
+                      <th>Work</th>
+                      <th>Project</th>
+                      <th>Source</th>
+                      <th>Model</th>
+                      <th>Hours</th>
+                      <th>Tokens</th>
+                      <th>API $</th>
+                    </tr>
+                  </thead>
                   <tbody>
-                    ${summary.projects
-                      .map(
-                        (p) => `<tr>
-                          <td>${esc(p.name)}</td>
-                          <td>${p.sessions}</td>
-                          <td>${fmtInt(p.inputTokens + p.outputTokens)}</td>
-                          <td>${usd(p.apiCost)}</td>
-                        </tr>`,
-                      )
-                      .join("")}
+                    ${rows
+                      .map((s) => usageRow(s))
+                      .join("") || `<tr><td colspan="8">No sessions in this window.</td></tr>`}
                   </tbody>
-                </table>`
-                : ""
-            }`
-          : `<p class="hint">Scan to list the work this Mac already completed in Claude Code and Codex.</p>`
+                </table>
+              </section>
+              ${
+                summary.projects.length
+                  ? `<section class="cell span-12">
+                      <div class="cell-head"><div><h2>By project</h2></div></div>
+                      <table class="ledger">
+                        <thead><tr><th>Project</th><th>Sessions</th><th>Tokens</th><th>API $</th></tr></thead>
+                        <tbody>
+                          ${summary.projects
+                            .map(
+                              (p) => `<tr>
+                                <td>${esc(p.name)}</td>
+                                <td>${p.sessions}</td>
+                                <td>${fmtInt(p.inputTokens + p.outputTokens)}</td>
+                                <td>${usd(p.apiCost)}</td>
+                              </tr>`,
+                            )
+                            .join("")}
+                        </tbody>
+                      </table>
+                    </section>`
+                  : ""
+              }
+            </div>`
+          : `<p class="hint pad">Scan to list the work this Mac already completed in Claude Code and Codex.</p>`
       }
     </div>
   `;
@@ -441,10 +528,12 @@ function usageRow(session: PricedSession): string {
 
 function modelsScreen(): string {
   return `
-    <div class="stage" style="max-width:1100px">
-      <p class="kicker">List prices · August 2026</p>
-      <p class="hint">Short-context API rates per 1M tokens. Edit a number to override for your workspace. Time factor is calendar days vs the workflow’s AI baseline (1.00 = baseline).</p>
-      <div class="models-grid" style="margin-top:18px">
+    <div class="stage">
+      <div class="stage-intro">
+        <p class="kicker">List prices · August 2026</p>
+        <p class="hint">Short-context API rates per 1M tokens. Edit a number to override for your workspace. Time factor is calendar days vs the workflow’s AI baseline (1.00 = baseline).</p>
+      </div>
+      <div class="models-grid">
         ${allModels(state.customModels)
           .map((m) => {
             return `<article class="model-card">
@@ -466,17 +555,17 @@ function modelsScreen(): string {
           })
           .join("")}
       </div>
-      <div class="section" style="margin-top:28px;max-width:520px">
+      <section class="cell span-12">
         <p class="kicker">Token estimate knobs</p>
-        <div class="pair">
+        <div class="pair" style="max-width:520px">
           ${est("codingInputPerHour", "Code in / AI-hour")}
           ${est("codingOutputPerHour", "Code out / AI-hour")}
         </div>
-        <div class="pair">
+        <div class="pair" style="max-width:520px">
           ${est("designInputPerHour", "Design in / AI-hour")}
           ${est("designOutputPerHour", "Design out / AI-hour")}
         </div>
-      </div>
+      </section>
     </div>
   `;
 }
@@ -489,7 +578,7 @@ function reportScreen(
   const inner = html.match(/<body>([\s\S]*)<\/body>/)?.[1] ?? "";
   return `
     <div class="stage">
-      <div class="actions" style="margin-bottom:16px">
+      <div class="toolbar">
         <button class="primary" data-act="print">Print / PDF</button>
         <button class="ghost" data-act="download-md">Markdown</button>
         <button class="ghost" data-act="download-html">HTML</button>
@@ -508,18 +597,18 @@ function compassSvg(comparison: ReturnType<typeof compareWorkflow>): string {
   return `
     <div>
       <svg class="compass" viewBox="0 0 280 280" role="img" aria-label="Sweet spot compass">
-        <circle cx="140" cy="140" r="126" fill="#161410" stroke="#322e28" />
-        <circle cx="140" cy="140" r="92" fill="none" stroke="#322e28" />
-        <circle cx="140" cy="140" r="54" fill="none" stroke="#322e28" />
-        <line x1="140" y1="22" x2="140" y2="258" stroke="#322e28" />
-        <line x1="22" y1="140" x2="258" y2="140" stroke="#322e28" />
-        <text x="140" y="16" text-anchor="middle" fill="#8c8478" font-size="9" font-family="IBM Plex Mono">FASTER</text>
-        <text x="268" y="144" text-anchor="end" fill="#8c8478" font-size="9" font-family="IBM Plex Mono">CHEAPER</text>
+        <circle cx="140" cy="140" r="126" fill="#f7f8fa" stroke="#eceef2" />
+        <circle cx="140" cy="140" r="92" fill="none" stroke="#eceef2" />
+        <circle cx="140" cy="140" r="54" fill="none" stroke="#eceef2" />
+        <line x1="140" y1="22" x2="140" y2="258" stroke="#eceef2" />
+        <line x1="22" y1="140" x2="258" y2="140" stroke="#eceef2" />
+        <text x="140" y="16" text-anchor="middle" fill="#8b9099" font-size="9" font-family="Inter, sans-serif">FASTER</text>
+        <text x="268" y="144" text-anchor="end" fill="#8b9099" font-size="9" font-family="Inter, sans-serif">CHEAPER</text>
         ${pts
           .map((p) => {
             const win = p.id === comparison.winner.id;
-            const fill = win ? "#e09f3e" : p.provider === "anthropic" ? "#2a9d8f" : "#c9c0ae";
-            return `<circle cx="${p.x}" cy="${p.y}" r="${win ? 8 : 5}" fill="${fill}">
+            const fill = win ? "#111113" : p.provider === "anthropic" ? "#2f9b74" : "#c5c9d0";
+            return `<circle cx="${p.x}" cy="${p.y}" r="${win ? 7 : 5}" fill="${fill}">
               <title>${esc(p.label)} · ${p.cfoScore} ${p.grade}</title>
             </circle>`;
           })
@@ -529,7 +618,7 @@ function compassSvg(comparison: ReturnType<typeof compareWorkflow>): string {
         ${pts
           .map((p) => {
             const win = p.id === comparison.winner.id;
-            const fill = win ? "#e09f3e" : p.provider === "anthropic" ? "#2a9d8f" : "#c9c0ae";
+            const fill = win ? "#111113" : p.provider === "anthropic" ? "#2f9b74" : "#c5c9d0";
             return `<span><i style="background:${fill}"></i>${esc(p.label)}</span>`;
           })
           .join("")}
@@ -552,7 +641,7 @@ function ledgerRow(
     <td>${lane.calendarDays}</td>
     <td>${base ? "—" : usd(lane.savingsVsContractor)}</td>
     <td>${base ? "—" : `${lane.roi.toFixed(1)}×`}</td>
-    <td>${base ? "—" : `${lane.cfoScore} ${lane.grade}`}</td>
+    <td>${base ? "—" : `${lane.cfoScore} ${gradePill(lane.grade)}`}</td>
   </tr>`;
 }
 
@@ -576,8 +665,95 @@ function est(key: keyof AppState["estimate"], label: string): string {
     <input type="number" step="1000" data-est="${key}" value="${state.estimate[key]}" /></label>`;
 }
 
-function metric(value: string, label: string): string {
-  return `<div class="metric"><b>${value}</b><span>${label}</span></div>`;
+function kpi(label: string, value: string, sub: string, glyph: string, score: number): string {
+  return `<section class="cell span-3 kpi">
+    <div class="kpi-top">
+      <div>
+        <h2>${esc(label)}</h2>
+        ${sub ? `<p>${esc(sub)}</p>` : ""}
+      </div>
+      <div class="kpi-icon">${icon(glyph)}</div>
+    </div>
+    <div class="kpi-chart">
+      ${gaugeSvg(score)}
+      <div class="kpi-value">${value}</div>
+    </div>
+  </section>`;
+}
+
+function gaugeSvg(score: number): string {
+  const t = clamp(score, 10, 82) / 100;
+  const start = Math.PI * 1.08;
+  const end = Math.PI * -0.08;
+  const a = start + (end - start) * t;
+  const cx = 100;
+  const cy = 96;
+  const r = 72;
+  const x = cx + r * Math.cos(a);
+  const y = cy - r * Math.sin(a);
+  const x2 = cx + (r - 11) * Math.cos(a);
+  const y2 = cy - (r - 11) * Math.sin(a);
+  return `<svg viewBox="0 0 200 118" aria-hidden="true">
+    <path d="M 24 98 A 76 76 0 0 1 176 98" fill="none" stroke="#e4e6ea" stroke-width="1.4" stroke-dasharray="1.2 5.5" stroke-linecap="round"/>
+    <line x1="${x.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#111113" stroke-width="1.6" stroke-linecap="round"/>
+    <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6" fill="#111113"/>
+  </svg>`;
+}
+
+function scoreBars(winner: ReturnType<typeof compareWorkflow>["winner"]): string {
+  const items = [
+    { label: "Cost", value: winner.costScore },
+    { label: "Speed", value: winner.speedScore },
+    { label: "Quality", value: winner.qualityScore },
+    { label: "CFO", value: winner.cfoScore },
+  ];
+  const best = Math.max(...items.map((i) => i.value));
+  return `<div class="bars">
+    ${items
+      .map((i) => {
+        const h = clamp(i.value, 8, 100);
+        const win = i.value === best;
+        return `<div class="bar${win ? " win" : ""}">
+          <div class="bar-track">
+            <div class="bar-fill" style="height:${h}%"></div>
+            <div class="bar-cap" style="bottom:${h}%"></div>
+            ${win ? `<span class="bar-tag" style="bottom:${h}%">${i.value}</span>` : ""}
+          </div>
+          <span>${i.label}</span>
+        </div>`;
+      })
+      .join("")}
+  </div>`;
+}
+
+function gradePill(grade: string): string {
+  const cls = grade === "A" ? "pill-a" : grade === "B" ? "pill-b" : grade === "F" ? "pill-f" : "pill-c";
+  return `<span class="stamp pill ${cls}">${esc(grade)}</span>`;
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+  return (name.replace(/[^A-Za-z0-9]/g, "").slice(0, 2) || "AI").toUpperCase();
+}
+
+function icon(name: string): string {
+  const common = `xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"`;
+  const paths: Record<string, string> = {
+    grid: `<rect x="3.5" y="3.5" width="7" height="7" rx="1.2"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.2"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.2"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.2"/>`,
+    bars: `<path d="M4 19V10"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19V8"/>`,
+    box: `<path d="M21 8.5 12 3 3 8.5v7L12 21l9-5.5v-7Z"/><path d="M3 8.5 12 14l9-5.5"/><path d="M12 14v7"/>`,
+    file: `<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5"/><path d="M8 13h8M8 17h5"/>`,
+    search: `<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>`,
+    download: `<path d="M12 4v10"/><path d="m8 10 4 4 4-4"/><path d="M5 19h14"/>`,
+    upload: `<path d="M12 20V10"/><path d="m8 14 4-4 4 4"/><path d="M5 5h14"/>`,
+    logout: `<path d="M10 7V5a2 2 0 0 1 2-2h7v18h-7a2 2 0 0 1-2-2v-2"/><path d="M4 12h11"/><path d="m12 8 4 4-4 4"/>`,
+    bag: `<path d="M6.5 8h11l.8 11.2A2 2 0 0 1 16.3 21H7.7a2 2 0 0 1-2-1.8L6.5 8Z"/><path d="M9 8V7a3 3 0 0 1 6 0v1"/>`,
+    clock: `<circle cx="12" cy="12" r="8"/><path d="M12 8v4.5l3 1.5"/>`,
+    trend: `<path d="M4 17 10 11l3 3 7-8"/><path d="M15 6h5v5"/>`,
+    refresh: `<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 5v5h-5"/>`,
+  };
+  return `<svg ${common}>${paths[name] ?? paths.grid}</svg>`;
 }
 
 function seg(field: string, value: string, label: string, current: string): string {
