@@ -514,6 +514,9 @@ button:focus-visible,
 }
 
 .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--icon);
@@ -522,15 +525,24 @@ button:focus-visible,
   font-size: 12px;
 }
 
+.chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--chip, var(--icon));
+  flex: 0 0 7px;
+}
+
 .chip:hover {
   border-color: #d5d8de;
   color: var(--ink);
 }
 
 .chip[aria-pressed="true"] {
-  border-color: var(--ink);
-  color: #fff;
-  background: var(--ink);
+  border-color: color-mix(in srgb, var(--chip, var(--ink)) 55%, #fff);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--chip, var(--ink)) 14%, #fff);
+  font-weight: 500;
 }
 
 .seg {

@@ -13,6 +13,29 @@ import type { AppState, BillingMode, InputMode, Workflow } from "./engine/types"
 import { exportState, importStateJson, loadState, saveState } from "./store";
 import "./styles.css";
 
+const MODEL_COLORS: Record<string, string> = {
+  "gpt-5.6-sol": "#4c6fff",
+  "gpt-5.6-terra": "#3d7fd6",
+  "gpt-5.6-luna": "#8b8fff",
+  "gpt-5.3-codex": "#6b5ce7",
+  "claude-opus-5": "#2f9b74",
+  "claude-sonnet-5": "#3db8a0",
+  "claude-opus-4.8": "#1f7a5c",
+  "claude-sonnet-4.6": "#5bb8d4",
+  "claude-fable-5": "#c9842a",
+  "claude-haiku-4.5": "#d15b4a",
+};
+
+const FALLBACK_COLORS = ["#6b7078", "#8b9099", "#a3a8b0", "#5c6570"];
+
+function modelColor(id?: string): string {
+  if (!id) return "#a3a8b0";
+  if (MODEL_COLORS[id]) return MODEL_COLORS[id];
+  let hash = 0;
+  for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return FALLBACK_COLORS[hash % FALLBACK_COLORS.length];
+}
+
 type Screen = "compare" | "usage" | "models" | "report";
 
 const state: AppState = loadState();
@@ -407,7 +430,7 @@ function compareScreen(
             ${allModels(state.customModels)
               .map((m) => {
                 const on = workflow.selectedModelIds.includes(m.id);
-                return `<button class="chip" data-toggle-model="${m.id}" aria-pressed="${on}">${esc(m.shortName)}</button>`;
+                return `<button class="chip" data-toggle-model="${m.id}" aria-pressed="${on}" style="--chip:${modelColor(m.id)}"><i class="chip-dot"></i>${esc(m.shortName)}</button>`;
               })
               .join("")}
           </div>
@@ -607,8 +630,8 @@ function compassSvg(comparison: ReturnType<typeof compareWorkflow>): string {
         ${pts
           .map((p) => {
             const win = p.id === comparison.winner.id;
-            const fill = win ? "#111113" : p.provider === "anthropic" ? "#2f9b74" : "#c5c9d0";
-            return `<circle cx="${p.x}" cy="${p.y}" r="${win ? 7 : 5}" fill="${fill}">
+            const fill = modelColor(p.modelId);
+            return `<circle cx="${p.x}" cy="${p.y}" r="${win ? 7 : 5}" fill="${fill}" stroke="#fff" stroke-width="${win ? 2 : 1}">
               <title>${esc(p.label)} · ${p.cfoScore} ${p.grade}</title>
             </circle>`;
           })
@@ -617,8 +640,7 @@ function compassSvg(comparison: ReturnType<typeof compareWorkflow>): string {
       <div class="legend">
         ${pts
           .map((p) => {
-            const win = p.id === comparison.winner.id;
-            const fill = win ? "#111113" : p.provider === "anthropic" ? "#2f9b74" : "#c5c9d0";
+            const fill = modelColor(p.modelId);
             return `<span><i style="background:${fill}"></i>${esc(p.label)}</span>`;
           })
           .join("")}
