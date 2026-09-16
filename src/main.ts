@@ -7,7 +7,8 @@ import {
   type LocalScanResult,
   type PricedSession,
 } from "./engine/localUsage";
-import { allModels } from "./engine/pricing";
+import { applyMarketQuotes, fetchMarketRates } from "./engine/marketRates";
+import { allModels, BUILTIN_PRICES_AS_OF } from "./engine/pricing";
 import { reportHtml, reportMarkdown } from "./engine/report";
 import type { AppState, BillingMode, InputMode, Workflow } from "./engine/types";
 import { exportState, importStateJson, loadState, saveState } from "./store";
@@ -47,6 +48,8 @@ let usageSelected = new Set<string>();
 let usageScan: LocalScanResult | null = null;
 let usageError = "";
 let usageLoading = false;
+let pricesLoading = false;
+let pricesError = "";
 
 declare global {
   interface Window {
@@ -86,38 +89,61 @@ function patchWorkflow(patch: Partial<Workflow>, keep?: HTMLInputElement | HTMLT
 
 function refresh(keep?: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement): void {
   persist();
-  const identity = keep ? fieldIdentity(keep) : null;
-  const start = keep && "selectionStart" in keep ? keep.selectionStart : null;
-  const end = keep && "selectionEnd" in keep ? keep.selectionEnd : null;
+  if (keep && document.activeElement === keep) {
+    patchLive(keep);
+    return;
+  }
   keepScroll = true;
   render();
   keepScroll = false;
-  if (!identity) return;
-  const next = root!.querySelector<HTMLInputElement | HTMLTextAreaElement>(identity);
-  if (!next) return;
-  next.focus();
-  if (start != null && end != null && "setSelectionRange" in next) {
-    try {
-      next.setSelectionRange(start, end);
-    } catch {
-      /* number inputs may reject selection */
-    }
-  }
 }
 
-function fieldIdentity(el: HTMLElement): string | null {
-  if (el.dataset.wf) return `[data-wf="${el.dataset.wf}"]`;
-  if (el.dataset.rate) return `[data-rate="${el.dataset.rate}"]`;
-  if (el.dataset.seat) return `[data-seat="${el.dataset.seat}"]`;
-  if (el.dataset.est) return `[data-est="${el.dataset.est}"]`;
-  if (el.dataset.price) return `[data-price="${el.dataset.price}"]`;
-  return null;
+function mainScreen(workflow: Workflow): string {
+  const comparison = compareWorkflow(state, workflow);
+  const tokens = tokensForLane(workflow, state.estimate);
+  if (screen === "compare") return compareScreen(workflow, comparison, tokens);
+  if (screen === "usage") return usageScreen();
+  if (screen === "models") return modelsScreen();
+  return reportScreen(workflow, comparison);
+}
+
+function syncChrome(workflow: Workflow): void {
+  const who = root!.querySelector(".nav-foot .who b");
+  if (who) who.textContent = workflow.name;
+  const avatar = root!.querySelector(".nav-foot .avatar");
+  if (avatar) avatar.textContent = initials(workflow.name);
+  const opt = root!.querySelector<HTMLOptionElement>(
+    `select[data-field="active"] option[value="${workflow.id}"]`,
+  );
+  if (opt) opt.textContent = workflow.name;
+}
+
+function patchLive(keep: HTMLElement): void {
+  const workflow = wf();
+  syncChrome(workflow);
+  if (screen !== "compare") return;
+  const board = root!.querySelector(".board");
+  if (!board) return;
+  const tmp = document.createElement("div");
+  tmp.innerHTML = compareScreen(
+    workflow,
+    compareWorkflow(state, workflow),
+    tokensForLane(workflow, state.estimate),
+  );
+  const nextBoard = tmp.firstElementChild;
+  if (!nextBoard) return;
+  const keepCell = keep.closest(".cell");
+  const curCells = [...board.children];
+  const nextCells = [...nextBoard.children];
+  if (curCells.length !== nextCells.length) return;
+  for (let i = 0; i < curCells.length; i++) {
+    if (keepCell && curCells[i] === keepCell) continue;
+    curCells[i].replaceWith(nextCells[i]);
+  }
 }
 
 function render(): void {
   const workflow = wf();
-  const comparison = compareWorkflow(state, workflow);
-  const tokens = tokensForLane(workflow, state.estimate);
   const desk = root!.querySelector<HTMLElement>(".desk");
   const y = desk ? desk.scrollTop : window.scrollY;
 
@@ -126,15 +152,7 @@ function render(): void {
       ${sidebar(workflow)}
       <div class="desk">
         ${topbar(workflow)}
-        ${
-          screen === "compare"
-            ? compareScreen(workflow, comparison, tokens)
-            : screen === "usage"
-              ? usageScreen()
-              : screen === "models"
-                ? modelsScreen()
-                : reportScreen(workflow, comparison)
-        }
+        ${mainScreen(workflow)}
       </div>
     </div>
   `;
@@ -199,6 +217,7 @@ function topbar(workflow: Workflow): string {
               </label>`
             : ""
         }
+        <button class="icon-btn" data-act="new-wf" title="New calculator" aria-label="New calculator">${icon("plus")}</button>
         <button class="icon-btn" data-act="export-state" title="Export workspace">${icon("download")}</button>
         <label class="icon-btn file-btn" title="Import workspace">${icon("upload")}
           <input class="hidden" type="file" accept="application/json" data-import="workspace" />
@@ -552,9 +571,18 @@ function usageRow(session: PricedSession): string {
 function modelsScreen(): string {
   return `
     <div class="stage">
-      <div class="stage-intro">
-        <p class="kicker">List prices · August 2026</p>
-        <p class="hint">Short-context API rates per 1M tokens. Edit a number to override for your workspace. Time factor is calendar days vs the workflow’s AI baseline (1.00 = baseline).</p>
+      <div class="stage-intro" data-prices="${pricesLoading ? "loading" : state.pricesRefreshedAt ? "ready" : "idle"}">
+        <div class="stage-intro-row">
+          <div>
+            <p class="kicker">List prices</p>
+            <p class="hint">Short-context API rates per 1M tokens. Edit a number to override for your workspace. Time factor is calendar days vs the workflow’s AI baseline (1.00 = baseline).</p>
+            <p class="meta">${esc(pricesStamp())}</p>
+            ${pricesError ? `<p class="hint" style="color:var(--danger)">${esc(pricesError)}</p>` : ""}
+          </div>
+          <button class="ghost" type="button" data-act="refresh-prices" ${pricesLoading ? "disabled" : ""}>
+            ${icon("refresh")}${pricesLoading ? "Refreshing…" : "Refresh rates"}
+          </button>
+        </div>
       </div>
       <div class="models-grid">
         ${allModels(state.customModels)
@@ -774,6 +802,7 @@ function icon(name: string): string {
     clock: `<circle cx="12" cy="12" r="8"/><path d="M12 8v4.5l3 1.5"/>`,
     trend: `<path d="M4 17 10 11l3 3 7-8"/><path d="M15 6h5v5"/>`,
     refresh: `<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 5v5h-5"/>`,
+    plus: `<path d="M12 5v14"/><path d="M5 12h14"/>`,
   };
   return `<svg ${common}>${paths[name] ?? paths.grid}</svg>`;
 }
@@ -843,7 +872,11 @@ function handleAct(act: string): void {
     state.workflows.push(next);
     state.activeWorkflowId = next.id;
     persist();
+    screen = "compare";
     render();
+    const name = root!.querySelector<HTMLInputElement>('[data-wf="name"]');
+    name?.focus();
+    name?.select();
   }
   if (act === "dup-wf") {
     const next = { ...structuredClone(wf()), id: uid(), name: `${wf().name} copy` };
@@ -872,6 +905,7 @@ function handleAct(act: string): void {
   }
   if (act === "export-state") download("ai-cfo-workspace.json", exportState(state));
   if (act === "scan-usage") void loadUsage();
+  if (act === "refresh-prices") void refreshPrices();
   if (act === "compare-selected" || act === "compare-all-visible") {
     const summary = usageScan ? summarizeUsage(usageScan, state.customModels) : null;
     if (!summary) return;
@@ -890,6 +924,45 @@ function handleAct(act: string): void {
     state.activeWorkflowId = next.id;
     persist();
     screen = "compare";
+    render();
+  }
+}
+
+function pricesStamp(): string {
+  if (state.pricesRefreshedAt) {
+    const when = new Date(state.pricesRefreshedAt);
+    const label = Number.isNaN(when.getTime())
+      ? state.pricesRefreshedAt
+      : when.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+    const source = state.pricesSource ? ` · ${state.pricesSource}` : "";
+    return `Last refreshed ${label}${source}`;
+  }
+  const builtin = new Date(`${BUILTIN_PRICES_AS_OF}T00:00:00`);
+  const day = Number.isNaN(builtin.getTime())
+    ? BUILTIN_PRICES_AS_OF
+    : builtin.toLocaleDateString(undefined, { dateStyle: "medium" });
+  return `Not yet refreshed · built-in rates from ${day}`;
+}
+
+async function refreshPrices(): Promise<void> {
+  if (pricesLoading) return;
+  pricesLoading = true;
+  pricesError = "";
+  render();
+  try {
+    const wanted = allModels(state.customModels).map((m) => m.id);
+    const result = await fetchMarketRates(wanted);
+    state.customModels = applyMarketQuotes(state.customModels, result.quotes);
+    state.pricesRefreshedAt = result.fetchedAt;
+    state.pricesSource = result.source;
+    persist();
+    if (result.missingIds.length) {
+      pricesError = `Updated ${result.quotes.length}. No market quote for ${result.missingIds.length}.`;
+    }
+  } catch (error) {
+    pricesError = error instanceof Error ? error.message : "Could not refresh market rates.";
+  } finally {
+    pricesLoading = false;
     render();
   }
 }

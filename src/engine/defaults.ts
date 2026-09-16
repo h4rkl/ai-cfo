@@ -161,6 +161,8 @@ export function defaultState(): AppState {
     workflows: [first],
     activeWorkflowId: first.id,
     customModels: [],
+    pricesRefreshedAt: null,
+    pricesSource: null,
   };
 }
 

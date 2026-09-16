@@ -1,9 +1,10 @@
 import { defineConfig } from "vitest/config";
 import { localUsagePlugin } from "./src/server/localUsagePlugin";
+import { modelPricesPlugin } from "./src/server/modelPricesPlugin";
 
 export default defineConfig({
   base: "./",
-  plugins: [localUsagePlugin()],
+  plugins: [localUsagePlugin(), modelPricesPlugin()],
   server: {
     port: 5173,
     strictPort: true,

@@ -135,6 +135,8 @@ export interface AppState {
   workflows: Workflow[];
   activeWorkflowId: string;
   customModels: ModelPricing[];
+  pricesRefreshedAt: string | null;
+  pricesSource: string | null;
 }
 
 export interface ImportedUsageRow {

@@ -7,6 +7,8 @@ import type { ModelPricing } from "./types";
  * Codex Sol / Terra / Luna are GPT-5.6 tiers used in Codex and the API.
  * gpt-5.3-codex is the dedicated Codex model.
  */
+export const BUILTIN_PRICES_AS_OF = "2026-08-19";
+
 export const BUILTIN_MODELS: ModelPricing[] = [
   {
     id: "gpt-5.6-sol",

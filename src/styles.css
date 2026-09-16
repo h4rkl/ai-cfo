@@ -875,7 +875,14 @@ button:focus-visible,
 }
 
 .stage-intro {
-  padding: 20px 24px 8px;
+  padding: 20px 24px 16px;
+}
+
+.stage-intro-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .stage-intro .kicker {
@@ -885,6 +892,30 @@ button:focus-visible,
 .stage-intro .hint {
   margin: 6px 0 0;
   max-width: 72ch;
+}
+
+.stage-intro .meta {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.stage-intro .ghost {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.stage-intro .ghost svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+}
+
+.stage-intro .ghost:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 .toolbar {
@@ -1076,6 +1107,10 @@ button:focus-visible,
 
   .pair {
     grid-template-columns: 1fr;
+  }
+
+  .stage-intro-row {
+    flex-direction: column;
   }
 
   .top {

@@ -38,6 +38,8 @@ function hydrate(parsed: Partial<AppState>): AppState {
     workflows,
     activeWorkflowId: parsed.activeWorkflowId ?? workflows[0].id,
     customModels: parsed.customModels ?? [],
+    pricesRefreshedAt: typeof parsed.pricesRefreshedAt === "string" ? parsed.pricesRefreshedAt : null,
+    pricesSource: typeof parsed.pricesSource === "string" ? parsed.pricesSource : null,
   };
 }
 
